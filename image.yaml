@@ -16,12 +16,13 @@ envs:
       value: /opt/spark
 modules:
       install:
+          - name: python36
+          - name: numpy
           - name: spark
           - name: metrics
 packages:
       install:
           - java-1.8.0-openjdk
-          - numpy
           - wget
 artifacts:
     - url: https://archive.apache.org/dist/spark/spark-2.3.0/spark-2.3.0-bin-hadoop2.7.tgz

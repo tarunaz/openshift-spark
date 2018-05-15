@@ -14,5 +14,8 @@ if [ -z "$uidentry" ] ; then
     fi
 fi
 
+# ensure we run with python36 as the default
+SCL_PYTHON36_ENABLE="scl enable rh-python36"
+
 # Execute the container CMD under tini for better hygiene
-exec tini -s -- "$@"
+exec tini -s -- $SCL_PYTHON36_ENABLE "$@"

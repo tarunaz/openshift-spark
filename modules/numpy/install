@@ -1,0 +1,7 @@
+#!/bin/sh
+set -u
+set -e
+
+# install numpy, this is done outside the image.yaml file to ensure that
+# the necessary py36 repositories and binaries are setup.
+yum install -y rh-python36-numpy
