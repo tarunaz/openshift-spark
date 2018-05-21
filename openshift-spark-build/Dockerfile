@@ -13,6 +13,8 @@
 #
 # ------------------------------------------------------------------------
 #
+# This is a Dockerfile for the radanalyticsio/openshift-spark:2.3-latest image.
+
 
 FROM centos:latest
 
@@ -24,6 +26,7 @@ ENV JBOSS_IMAGE_NAME="radanalyticsio/openshift-spark" \
     APP_ROOT="/opt/app-root" \
     CONDA_DIR=/opt/conda
 
+
 # Labels
 LABEL name="$JBOSS_IMAGE_NAME" \
       version="$JBOSS_IMAGE_VERSION" \
@@ -32,6 +35,7 @@ LABEL name="$JBOSS_IMAGE_NAME" \
       maintainer="Emma Qiu <emqiu@redhat.com>" \
       sparkversion="2.3.0" \
       org.concrt.version="1.4.0"
+
 
 USER root
 
