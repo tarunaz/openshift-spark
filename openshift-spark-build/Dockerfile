@@ -9,44 +9,58 @@
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# See the License for the specific language governing permissions and # limitations under the License.
 #
 # ------------------------------------------------------------------------
 #
-# This is a Dockerfile for the testing/openshift-spark:0.4.3 image.
 
 FROM centos:latest
 
 # Environment variables
-ENV JBOSS_IMAGE_NAME="testing/openshift-spark" \
-    JBOSS_IMAGE_VERSION="0.4.3" \
-    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/spark/bin" \
-    SPARK_HOME="/opt/spark" 
+ENV JBOSS_IMAGE_NAME="radanalyticsio/openshift-spark" \
+    JBOSS_IMAGE_VERSION="2.3-latest" \
+    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/spark/bin:/opt/conda/bin" \
+    SPARK_HOME="/opt/spark" \
+    APP_ROOT="/opt/app-root" \
+    CONDA_DIR=/opt/conda
 
 # Labels
 LABEL name="$JBOSS_IMAGE_NAME" \
       version="$JBOSS_IMAGE_VERSION" \
       architecture="x86_64" \
-      com.redhat.component="testing-openshift-spark-docker" \
-      maintainer="Chad Roberts <croberts@redhat.com>" \
-      sparkversion="2.2.1" \
+      com.redhat.component="radanalyticsio-openshift-spark-docker" \
+      maintainer="Emma Qiu <emqiu@redhat.com>" \
+      sparkversion="2.3.0" \
       org.concrt.version="1.4.0"
-
 
 USER root
 
+# Install rh-python36 on centos7
+RUN yum install -y centos-release-scl-rh && \
+    yum-config-manager --enable centos-sclo-rh && \
+    yum install -y rh-python36
+
+# Enable the rh-python36
+RUN mkdir -p ${APP_ROOT}/etc
+RUN echo "source scl_source enable rh-python36" > ${APP_ROOT}/etc/scl_enable
+RUN chmod 666 ${APP_ROOT}/etc/scl_enable
+ENV APP_ROOT /opt/app-root
+ENV BASH_ENV=${APP_ROOT}/etc/scl_enable \
+    ENV=${APP_ROOT}/etc/scl_enable \
+    PROMPT_COMMAND=". ${APP_ROOT}/etc/scl_enable"
+
+USER root
 
 # Install required RPMs and ensure that the packages were installed
-RUN yum install -y  java-1.8.0-openjdk numpy wget \
+RUN yum install -y java-1.8.0-openjdk numpy wget curl tree java-headless bzip2 gnupg2 sqlite3 gcc gcc-c++ glibc-devel git mesa-libGL mesa-libGL-devel ca-certificates vim \
     && yum clean all && \
-    rpm -q  java-1.8.0-openjdk numpy wget
+    rpm -q java-1.8.0-openjdk numpy wget
 
 # Add all artifacts to the /tmp/artifacts
 # directory
 COPY \
-    spark-2.2.1-bin-hadoop2.7.tgz \
-    /tmp/artifacts/
+     spark-2.3.0-bin-hadoop2.7.tgz \
+     /tmp/artifacts/
 
 # Add scripts used to configure the image
 COPY modules /tmp/scripts
@@ -60,10 +74,59 @@ RUN [ "bash", "-x", "/tmp/scripts/metrics/install" ]
 
 USER root
 RUN rm -rf /tmp/scripts
+
 USER root
 RUN rm -rf /tmp/artifacts
 
+USER root
+
+#Install Python libraries
+ADD fix-permissions.sh /usr/local/bin/fix-permissions.sh
+RUN cd /tmp \
+    && curl -s -o Miniconda3.sh https://repo.continuum.io/miniconda/Miniconda3-4.3.21-Linux-x86_64.sh \
+    && echo c1c15d3baba15bf50293ae963abef853 Miniconda3.sh | md5sum -c - \
+    && bash Miniconda3.sh -b -p $CONDA_DIR \
+    && rm Miniconda3.sh \
+    && export PATH=$CONDA_DIR/bin:$PATH \
+    && $CONDA_DIR/bin/conda config --system --prepend channels conda-forge  \
+    && $CONDA_DIR/bin/conda config --system --set auto_update_conda false  \
+    && $CONDA_DIR/bin/conda config --system --set show_channel_urls true  \
+    && $CONDA_DIR/bin/conda update --all --quiet --yes  \
+    && $CONDA_DIR/bin/conda install -c conda-forge 'jupyterhub=0.8.1' \
+    && $CONDA_DIR/bin/conda install --quiet --yes 'nomkl' jupyter 'notebook=5.4.1' \
+        'jupyterlab=0.32.0*' \
+        'ipywidgets=7.0*' \
+        'pandas=0.19*' \
+        'matplotlib=2.0*' \
+        'scipy=0.19*' \
+        'seaborn=0.7*' \
+        'scikit-learn=0.18*' \
+        'protobuf=3.*' \
+    && $CONDA_DIR/bin/conda clean -tipsy \
+    && $CONDA_DIR/bin/conda remove --quiet --yes --force qt pyqt \
+    && jupyter nbextension enable --py widgetsnbextension --sys-prefix \
+    && fix-permissions.sh $CONDA_DIR
+
+RUN yum -y install epel-release
+#Install pip for installing python libraries
+RUN yum -y install python-pip
+
+#Install the NLTK library for Spark
+RUN pip install nltk
+
+RUN export NLTK_DATA=/usr/share/nltk_data
+
+#The NLTK library needs a language, this installs punkt
+RUN python -m nltk.downloader -d /usr/share/nltk_data punkt
+
+RUN chmod 0755 /usr/share/nltk_data
+
 USER 185
+
+#Install hadoop-aws-2.7.3 jar
+#RUN wget http://central.maven.org/maven2/org/apache/hadoop/hadoop-aws/2.7.3/hadoop-aws-2.7.3.jar -O /opt/spark/jars/hadoop-aws-2.7.3.jar
+#Install aws=java-sdk-1.7.4.jar
+#RUN wget http://central.maven.org/maven2/com/amazonaws/aws-java-sdk/1.7.4/aws-java-sdk-1.7.4.jar -O /opt/spark/jars/aws-java-sdk-1.7.4.jar
 
 # Specify the working directory
 WORKDIR /tmp
