@@ -23,9 +23,7 @@ ENV JBOSS_IMAGE_NAME="radanalyticsio/openshift-spark" \
     JBOSS_IMAGE_VERSION="2.3-latest" \
     SPARK_HOME="/opt/spark" \
     APP_ROOT="/opt/app-root" \
-    HIVE_HOME="/usr/local/hive" \
-    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/spark/bin:/opt/rh/rh-python36/root/usr/bin:/usr/local/hive/bin" \
-    CLASSPATH=$CLASSPATH:/usr/local/Hadoop/lib/*:/usr/local/hive/lib/*:.
+    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/spark/bin:/opt/rh/rh-python36/root/usr/bin"
 
 
 # Labels
@@ -56,22 +54,16 @@ ENV BASH_ENV=${APP_ROOT}/etc/scl_enable \
 USER root
 
 # Install required RPMs and ensure that the packages were installed
-RUN yum install -y java-1.8.0-openjdk wget curl tree java-headless bzip2 gnupg2 sqlite3 gcc gcc-c++ glibc-devel git mesa-libGL mesa-libGL-devel ca-certificates vim \
-    && yum clean all && \
-    rpm -q java-1.8.0-openjdk wget
+RUN yum install -y java-1.8.0-openjdk wget curl tree java-headless bzip2 gnupg2 sqlite3 gcc gcc-c++ glibc-devel git mesa-libGL mesa-libGL-devel ca-certificates vim epel-release \
+    && yum clean all \
+    && rm -rf /var/cache/yum \
+    && rpm -q java-1.8.0-openjdk wget
 
 # Add all artifacts to the /tmp/artifacts
 # directory
 COPY \
      spark-2.3.0-bin-hadoop2.7.tgz \
      /tmp/artifacts/
-
-COPY \
-     apache-hive-0.14.0-bin.tar.gz \
-     /tmp/artifacts/
-
-RUN mkdir -p /usr/local/hive \
-    && tar -xzvf /tmp/artifacts/apache-hive-0.14.0-bin.tar.gz -C /usr/local/hive
 
 # Add scripts used to configure the image
 COPY modules /tmp/scripts
@@ -85,11 +77,9 @@ RUN [ "bash", "-x", "/tmp/scripts/metrics/install" ]
 
 RUN rm -rf /tmp/scripts
 RUN rm -rf /tmp/artifacts
-
-RUN yum -y install epel-release
-
+    
 #Install the NLTK library for Spark
-RUN pip install nltk
+RUN pip install --no-cache-dir nltk
 
 RUN export NLTK_DATA=/usr/share/nltk_data
 
@@ -99,14 +89,9 @@ RUN /opt/rh/rh-python36/root/usr/bin/python -m nltk.downloader -d /usr/share/nlt
 RUN chmod 0755 /usr/share/nltk_data
 		
 #Install other packages		
-RUN pip install pandas scipy seaborn scikit-learn protobuf ipywidgets 
+RUN pip install --no-cache-dir pandas scipy seaborn scikit-learn protobuf ipywidgets 
 
 USER 185
-
-#Install hadoop-aws-2.7.3 jar
-#RUN wget http://central.maven.org/maven2/org/apache/hadoop/hadoop-aws/2.7.3/hadoop-aws-2.7.3.jar -O /opt/spark/jars/hadoop-aws-2.7.3.jar
-#Install aws=java-sdk-1.7.4.jar
-#RUN wget http://central.maven.org/maven2/com/amazonaws/aws-java-sdk/1.7.4/aws-java-sdk-1.7.4.jar -O /opt/spark/jars/aws-java-sdk-1.7.4.jar
 
 # Specify the working directory
 WORKDIR /tmp
